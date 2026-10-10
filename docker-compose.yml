@@ -7,12 +7,29 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/readyz"]
       interval: 5s
       timeout: 3s
       retries: 3
       start_period: 5s
+
+  migrate:
+    build:
+      context: .
+      dockerfile: tern.Dockerfile
+    container_name: coin-transfer-migrate
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGDATABASE: app
+      PGUSER: psswrd
+      PGPASSWORD: psswrd
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   postgres:
     image: postgres:18-alpine3.24
