@@ -1,0 +1,35 @@
+services:
+  app:
+    build: .
+    container_name: coin-transfer-app
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  postgres:
+    image: postgres:18-alpine3.24
+    container_name: coin-transfer-postgres
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: psswrd
+      POSTGRES_PASSWORD: psswrd
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U psswrd -d app"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  postgres_data:
