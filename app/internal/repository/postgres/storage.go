@@ -25,7 +25,7 @@ type Storage struct {
 
 var _ entity.Storage = (*Storage)(nil)
 
-func New(pool *pgxpool.Pool) *Storage {
+func NewStorage(pool *pgxpool.Pool) *Storage {
 	return &Storage{db: pool}
 }
 

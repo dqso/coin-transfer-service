@@ -1,18 +1,27 @@
 package entity
 
-import "errors"
-
 var (
-	ErrIdempotencyKeyConflict = errors.New("idempotency key is already used with other payment details")
-	ErrTransferInProgress     = errors.New("transfer is in progress")
-	ErrTransferNotFound       = errors.New("transfer not found")
-	ErrAccountNotFound        = errors.New("account not found")
+	ErrIdempotencyKeyConflict = NewError(CodeIdempotencyKeyConflict)
+	ErrTransferInProgress     = NewError(CodeTransferInProgress)
+	ErrTransferNotFound       = NewError(CodeTransferNotFound)
+	ErrAccountNotFound        = NewError(CodeAccountNotFound)
 )
 
-type ValidationError struct {
-	Reason string
+// Error is an error that the client can see. Its code tells the kind of the error.
+type Error struct {
+	Code    Code
+	Message string
 }
 
-func (e ValidationError) Error() string {
-	return e.Reason
+func (e *Error) Error() string {
+	return e.Message
+}
+
+// NewError creates an error with the standard message of the code.
+func NewError(code Code) *Error {
+	return &Error{Code: code, Message: code.String()}
+}
+
+func NewValidationError(message string) *Error {
+	return &Error{Code: CodeInvalidRequest, Message: message}
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -10,7 +11,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/dqso/coin-transfer-service/app/internal/repository/postgres"
 	transporthttp "github.com/dqso/coin-transfer-service/app/internal/transport/http"
+	"github.com/dqso/coin-transfer-service/app/internal/usecase"
 )
 
 func main() {
@@ -26,7 +31,23 @@ func run(log *slog.Logger) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	httpHandler := transporthttp.NewHandler()
+	// pgx reads the connection settings from the PG* environment variables.
+	pool, err := pgxpool.New(ctx, "")
+	if err != nil {
+		return fmt.Errorf("create database pool: %w", err)
+	}
+	defer pool.Close()
+
+	storage := postgres.NewStorage(pool)
+
+	uc := usecase.NewUsecase(storage)
+
+	httpHandler, err := transporthttp.NewHandler(log, uc,
+		pool.Ping,
+	)
+	if err != nil {
+		return fmt.Errorf("create http handler: %w", err)
+	}
 
 	httpServer := &http.Server{
 		Addr:              ":3000",

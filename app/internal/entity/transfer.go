@@ -10,6 +10,10 @@ const (
 	TransferStatusRejected   TransferStatus = "rejected"
 )
 
+func (s TransferStatus) String() string {
+	return string(s)
+}
+
 type Transfer struct {
 	ID             int64
 	IdempotencyKey string
@@ -17,9 +21,9 @@ type Transfer struct {
 	ToAccount      AccountRef
 	Amount         int64
 	Status         TransferStatus
-	// Reason is set only for rejected transfers.
-	Reason    string
-	CreatedAt time.Time
+	// ReasonCode is set only for rejected transfers.
+	ReasonCode Code
+	CreatedAt  time.Time
 }
 
 func (t Transfer) IsSamePaymentDetails(fromAccountCode, toAccountCode string, amount int64) bool {

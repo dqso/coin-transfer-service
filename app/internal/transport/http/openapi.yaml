@@ -1,0 +1,169 @@
+openapi: 3.0.3
+info:
+  title: Coin Transfer Service
+  version: 1.0.0
+
+paths:
+  /api/v1/transfers:
+    post:
+      operationId: createTransfer
+      summary: Transfer coins between accounts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTransferRequest"
+      responses:
+        "200":
+          description: The transfer is completed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateTransferResponse"
+        "422":
+          description: The transfer is rejected.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RejectedTransfer"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/v1/transfers/{idempotency_key}:
+    get:
+      operationId: getTransfer
+      summary: Get a transfer by idempotency key
+      parameters:
+        - name: idempotency_key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The transfer.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transfer"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/v1/accounts/{id}:
+    get:
+      operationId: getAccount
+      summary: Get account balance
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The account.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+        default:
+          $ref: "#/components/responses/Error"
+
+components:
+  responses:
+    Error:
+      description: An error. The HTTP status tells the kind of the error.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    CreateTransferRequest:
+      type: object
+      required: [idempotency_key, from_account_id, to_account_id, amount]
+      properties:
+        idempotency_key:
+          type: string
+          minLength: 1
+        from_account_id:
+          type: string
+          minLength: 1
+        to_account_id:
+          type: string
+          minLength: 1
+        amount:
+          type: integer
+          format: int64
+          minimum: 1
+
+    CreateTransferResponse:
+      type: object
+      required: [transfer_id, status, from_account_id, to_account_id, amount]
+      properties:
+        transfer_id:
+          type: string
+        status:
+          type: string
+          enum: [completed]
+        from_account_id:
+          type: string
+        to_account_id:
+          type: string
+        amount:
+          type: integer
+          format: int64
+
+    RejectedTransfer:
+      type: object
+      required: [status, reason, code]
+      properties:
+        status:
+          type: string
+          enum: [rejected]
+        reason:
+          type: string
+        code:
+          type: integer
+
+    Transfer:
+      type: object
+      required: [transfer_id, idempotency_key, from_account_id, to_account_id, amount, status, created_at]
+      properties:
+        transfer_id:
+          type: string
+        idempotency_key:
+          type: string
+        from_account_id:
+          type: string
+        to_account_id:
+          type: string
+        amount:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum: [completed, rejected]
+        created_at:
+          type: string
+          format: date-time
+
+    Account:
+      type: object
+      required: [account_id, balance]
+      properties:
+        account_id:
+          type: string
+        balance:
+          type: integer
+          format: int64
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: integer
+        message:
+          type: string

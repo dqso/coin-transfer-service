@@ -58,7 +58,7 @@ func (s *Storage) GetTransferByIdempotencyKey(ctx context.Context, idempotencyKe
 		       coalesce(ta.code, t.to_account_code),
 		       t.amount,
 		       t.status,
-		       coalesce(t.reason, ''),
+		       coalesce(t.reason_code, 0),
 		       t.created_at
 		FROM transfers t
 		LEFT JOIN accounts fa ON fa.id = t.from_account_id
@@ -74,7 +74,7 @@ func (s *Storage) GetTransferByIdempotencyKey(ctx context.Context, idempotencyKe
 		&transfer.ToAccount.Code,
 		&transfer.Amount,
 		&transfer.Status,
-		&transfer.Reason,
+		&transfer.ReasonCode,
 		&transfer.CreatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -91,14 +91,14 @@ func (s *Storage) UpdateTransfer(ctx context.Context, transfer entity.Transfer) 
 	tag, err := s.db.Exec(ctx, `
 		UPDATE transfers
 		SET status            = $2,
-		    reason            = nullif($3, ''),
+		    reason_code       = nullif($3::INTEGER, 0),
 		    from_account_id   = $4,
 		    from_account_code = CASE WHEN $4::BIGINT IS NULL THEN from_account_code END,
 		    to_account_id     = $5,
 		    to_account_code   = CASE WHEN $5::BIGINT IS NULL THEN to_account_code END,
 		    updated_at        = now()
 		WHERE id = $1`,
-		transfer.ID, transfer.Status, transfer.Reason, transfer.FromAccount.ID, transfer.ToAccount.ID,
+		transfer.ID, transfer.Status, transfer.ReasonCode, transfer.FromAccount.ID, transfer.ToAccount.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("update transfer: %w", err)

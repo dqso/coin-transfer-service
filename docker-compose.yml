@@ -4,6 +4,12 @@ services:
     container_name: coin-transfer-app
     ports:
       - "3000:3000"
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGDATABASE: devdb
+      PGUSER: app
+      PGPASSWORD: psswrd
     depends_on:
       postgres:
         condition: service_healthy

@@ -10,7 +10,7 @@ type Storage interface {
 	// CreateOrGetTransfer creates an in-progress transfer. If the idempotency key is already used, it returns the saved transfer.
 	CreateOrGetTransfer(ctx context.Context, idempotenceKey, fromAccountCode, toAccountCode string, amount int64) (_ Transfer, wasCreated bool, _ error)
 	GetTransferByIdempotencyKey(ctx context.Context, idempotencyKey string) (Transfer, error)
-	// UpdateTransfer saves the status, the reason and the account ids of the transfer.
+	// UpdateTransfer saves the status, the reason code and the account ids of the transfer.
 	UpdateTransfer(ctx context.Context, transfer Transfer) error
 	GetAccountByCode(ctx context.Context, code string) (Account, error)
 	// GetTwoAccountsWithBlock locks the accounts in the order of their ids. An account is nil if it is not found.
