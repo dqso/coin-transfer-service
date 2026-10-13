@@ -7,6 +7,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/readyz"]
       interval: 5s
@@ -14,19 +16,34 @@ services:
       retries: 3
       start_period: 5s
 
+  migrate:
+    build:
+      context: .
+      dockerfile: tern.Dockerfile
+    container_name: coin-transfer-migrate
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGDATABASE: devdb
+      PGUSER: app
+      PGPASSWORD: psswrd
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   postgres:
     image: postgres:18-alpine3.24
     container_name: coin-transfer-postgres
     environment:
-      POSTGRES_DB: app
-      POSTGRES_USER: psswrd
+      POSTGRES_DB: devdb
+      POSTGRES_USER: app
       POSTGRES_PASSWORD: psswrd
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U psswrd -d app"]
+      test: ["CMD-SHELL", "pg_isready -U app -d devdb"]
       interval: 2s
       timeout: 3s
       retries: 15
