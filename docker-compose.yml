@@ -24,8 +24,8 @@ services:
     environment:
       PGHOST: postgres
       PGPORT: 5432
-      PGDATABASE: app
-      PGUSER: psswrd
+      PGDATABASE: devdb
+      PGUSER: app
       PGPASSWORD: psswrd
     depends_on:
       postgres:
@@ -35,15 +35,15 @@ services:
     image: postgres:18-alpine3.24
     container_name: coin-transfer-postgres
     environment:
-      POSTGRES_DB: app
-      POSTGRES_USER: psswrd
+      POSTGRES_DB: devdb
+      POSTGRES_USER: app
       POSTGRES_PASSWORD: psswrd
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U psswrd -d app"]
+      test: ["CMD-SHELL", "pg_isready -U app -d devdb"]
       interval: 2s
       timeout: 3s
       retries: 15

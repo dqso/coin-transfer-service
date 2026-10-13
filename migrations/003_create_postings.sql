@@ -3,8 +3,8 @@
 -- All postings of one operation must add up to zero.
 CREATE TABLE postings (
     id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    -- NULL for internal operations that do not come from the API, for example the seed.
-    transfer_id BIGINT REFERENCES transfers (id),
+    -- Every posting belongs to a transfer, even for internal operations like the seed.
+    transfer_id BIGINT NOT NULL REFERENCES transfers (id),
     account_id  BIGINT NOT NULL REFERENCES accounts (id),
     amount      BIGINT NOT NULL,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
