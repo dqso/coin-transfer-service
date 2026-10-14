@@ -1,0 +1,325 @@
+openapi: 3.0.3
+info:
+  title: Coin Transfer Service
+  version: 1.0.0
+
+paths:
+  /api/v1/transfers:
+    post:
+      operationId: createTransfer
+      summary: Transfer coins between accounts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTransferRequest"
+            examples:
+              transfer:
+                summary: Transfer
+                value:
+                  idempotency_key: 01234567-89ab-cdef-0123-456789abcdef
+                  from_account_id: acc_1
+                  to_account_id: acc_2
+                  amount: 100
+              insufficientFunds:
+                summary: Not enough coins
+                value:
+                  idempotency_key: 11111111-2222-3333-4444-555555555555
+                  from_account_id: acc_1
+                  to_account_id: acc_2
+                  amount: 1000000
+              selfTransfer:
+                summary: Transfer to the same account
+                value:
+                  idempotency_key: 22222222-3333-4444-5555-666666666666
+                  from_account_id: acc_1
+                  to_account_id: acc_1
+                  amount: 100
+              unknownAccount:
+                summary: Unknown account
+                value:
+                  idempotency_key: 33333333-4444-5555-6666-777777777777
+                  from_account_id: acc_1
+                  to_account_id: acc_404
+                  amount: 100
+      responses:
+        "200":
+          description: The transfer is completed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateTransferResponse"
+              examples:
+                completed:
+                  summary: Completed
+                  value:
+                    transfer_id: "42"
+                    status: completed
+                    from_account_id: acc_1
+                    to_account_id: acc_2
+                    amount: 100
+        "422":
+          description: The transfer is rejected.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RejectedTransfer"
+              examples:
+                selfTransfer:
+                  summary: Transfer to the same account
+                  value:
+                    status: rejected
+                    reason: self-transfer not allowed
+                    code: 422001
+                accountNotFound:
+                  summary: Unknown account
+                  value:
+                    status: rejected
+                    reason: account not found
+                    code: 422002
+                insufficientFunds:
+                  summary: Not enough coins
+                  value:
+                    status: rejected
+                    reason: insufficient funds
+                    code: 422003
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/v1/transfers/{idempotency_key}:
+    get:
+      operationId: getTransfer
+      summary: Get a transfer by idempotency key
+      parameters:
+        - name: idempotency_key
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 255
+          example: 01234567-89ab-cdef-0123-456789abcdef
+      responses:
+        "200":
+          description: The transfer.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transfer"
+              examples:
+                completed:
+                  summary: Completed
+                  value:
+                    transfer_id: "42"
+                    idempotency_key: 01234567-89ab-cdef-0123-456789abcdef
+                    from_account_id: acc_1
+                    to_account_id: acc_2
+                    amount: 100
+                    status: completed
+                    created_at: "2026-10-14T12:00:00Z"
+                rejected:
+                  summary: Rejected
+                  value:
+                    transfer_id: "43"
+                    idempotency_key: 11111111-2222-3333-4444-555555555555
+                    from_account_id: acc_1
+                    to_account_id: acc_2
+                    amount: 1000000
+                    status: rejected
+                    reason: insufficient funds
+                    code: 422003
+                    created_at: "2026-10-14T12:01:00Z"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/v1/accounts/{id}:
+    get:
+      operationId: getAccount
+      summary: Get account balance
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 64
+          example: acc_1
+      responses:
+        "200":
+          description: The account.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+              examples:
+                account:
+                  summary: Account
+                  value:
+                    account_id: acc_1
+                    balance: 900
+        default:
+          $ref: "#/components/responses/Error"
+
+components:
+  responses:
+    Error:
+      description: An error. The HTTP status tells the kind of the error. It is also the first three digits of the code.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          examples:
+            invalidRequest:
+              summary: 400 Invalid request
+              value:
+                code: 400001
+                message: idempotency key cannot be empty
+            transferNotFound:
+              summary: 404 Transfer not found
+              value:
+                code: 404001
+                message: transfer not found
+            accountNotFound:
+              summary: 404 Account not found
+              value:
+                code: 404002
+                message: account not found
+            idempotencyKeyConflict:
+              summary: 409 Idempotency key is used with other details
+              value:
+                code: 409001
+                message: idempotency key is already used with other payment details
+            transferInProgress:
+              summary: 409 Transfer is in progress
+              value:
+                code: 409002
+                message: transfer is in progress
+            internal:
+              summary: 500 Internal error
+              value:
+                code: 500001
+                message: internal error
+
+  schemas:
+    CreateTransferRequest:
+      type: object
+      required: [idempotency_key, from_account_id, to_account_id, amount]
+      properties:
+        idempotency_key:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: 01234567-89ab-cdef-0123-456789abcdef
+        from_account_id:
+          type: string
+          minLength: 1
+          maxLength: 64
+          example: acc_1
+        to_account_id:
+          type: string
+          minLength: 1
+          maxLength: 64
+          example: acc_2
+        amount:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 1000000000
+          example: 100
+
+    CreateTransferResponse:
+      type: object
+      required: [transfer_id, status, from_account_id, to_account_id, amount]
+      properties:
+        transfer_id:
+          type: string
+          example: "42"
+        status:
+          type: string
+          enum: [completed]
+          example: completed
+        from_account_id:
+          type: string
+          example: acc_1
+        to_account_id:
+          type: string
+          example: acc_2
+        amount:
+          type: integer
+          format: int64
+          example: 100
+
+    RejectedTransfer:
+      type: object
+      required: [status, reason, code]
+      properties:
+        status:
+          type: string
+          enum: [rejected]
+          example: rejected
+        reason:
+          type: string
+          example: insufficient funds
+        code:
+          type: integer
+          example: 422003
+
+    Transfer:
+      type: object
+      required: [transfer_id, idempotency_key, from_account_id, to_account_id, amount, status, created_at]
+      properties:
+        transfer_id:
+          type: string
+          example: "42"
+        idempotency_key:
+          type: string
+          example: 01234567-89ab-cdef-0123-456789abcdef
+        from_account_id:
+          type: string
+          example: acc_1
+        to_account_id:
+          type: string
+          example: acc_2
+        amount:
+          type: integer
+          format: int64
+          example: 100
+        status:
+          type: string
+          enum: [completed, rejected]
+          example: completed
+        reason:
+          type: string
+          description: Only for a rejected transfer.
+          example: insufficient funds
+        code:
+          type: integer
+          description: Only for a rejected transfer.
+          example: 422003
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-10-14T12:00:00Z"
+
+    Account:
+      type: object
+      required: [account_id, balance]
+      properties:
+        account_id:
+          type: string
+          example: acc_1
+        balance:
+          type: integer
+          format: int64
+          example: 900
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: integer
+          example: 404002
+        message:
+          type: string
+          example: account not found

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -46,10 +47,9 @@ func (s *Storage) CreateOrGetTransfer(ctx context.Context, idempotenceKey, fromA
 }
 
 func (s *Storage) GetTransferByIdempotencyKey(ctx context.Context, idempotencyKey string) (entity.Transfer, error) {
-	var transfer entity.Transfer
 	// The account code is saved in transfers only for unknown accounts.
 	// For known accounts it comes from the accounts table.
-	err := s.db.QueryRow(ctx, `
+	transfer, err := scanTransfer(s.db.QueryRow(ctx, `
 		SELECT t.id,
 		       t.idempotency_key,
 		       t.from_account_id,
@@ -58,14 +58,80 @@ func (s *Storage) GetTransferByIdempotencyKey(ctx context.Context, idempotencyKe
 		       coalesce(ta.code, t.to_account_code),
 		       t.amount,
 		       t.status,
-		       coalesce(t.reason, ''),
+		       coalesce(t.reason_code, 0),
 		       t.created_at
 		FROM transfers t
 		LEFT JOIN accounts fa ON fa.id = t.from_account_id
 		LEFT JOIN accounts ta ON ta.id = t.to_account_id
 		WHERE t.idempotency_key = $1`,
 		idempotencyKey,
-	).Scan(
+	))
+	if err != nil {
+		return entity.Transfer{}, fmt.Errorf("get transfer by idempotency key: %w", err)
+	}
+	return transfer, nil
+}
+
+func (s *Storage) GetTransferWithBlock(ctx context.Context, transferID int64) (entity.Transfer, error) {
+	// FOR UPDATE OF t locks only the transfer row, not the accounts.
+	transfer, err := scanTransfer(s.db.QueryRow(ctx, `
+		SELECT t.id,
+		       t.idempotency_key,
+		       t.from_account_id,
+		       coalesce(fa.code, t.from_account_code),
+		       t.to_account_id,
+		       coalesce(ta.code, t.to_account_code),
+		       t.amount,
+		       t.status,
+		       coalesce(t.reason_code, 0),
+		       t.created_at
+		FROM transfers t
+		LEFT JOIN accounts fa ON fa.id = t.from_account_id
+		LEFT JOIN accounts ta ON ta.id = t.to_account_id
+		WHERE t.id = $1
+		FOR UPDATE OF t`,
+		transferID,
+	))
+	if err != nil {
+		return entity.Transfer{}, fmt.Errorf("get transfer with block: %w", err)
+	}
+	return transfer, nil
+}
+
+func (s *Storage) GetStuckTransferWithBlock(ctx context.Context, stuckAfter time.Duration) (entity.Transfer, error) {
+	// SKIP LOCKED lets several workers run at the same time: each one takes its own transfer.
+	// A transfer that is in work now is locked, so it is skipped too.
+	transfer, err := scanTransfer(s.db.QueryRow(ctx, `
+		SELECT t.id,
+		       t.idempotency_key,
+		       t.from_account_id,
+		       coalesce(fa.code, t.from_account_code),
+		       t.to_account_id,
+		       coalesce(ta.code, t.to_account_code),
+		       t.amount,
+		       t.status,
+		       coalesce(t.reason_code, 0),
+		       t.created_at
+		FROM transfers t
+		LEFT JOIN accounts fa ON fa.id = t.from_account_id
+		LEFT JOIN accounts ta ON ta.id = t.to_account_id
+		WHERE t.status = $1
+		  AND t.updated_at < now() - make_interval(secs => $2)
+		ORDER BY t.updated_at
+		LIMIT 1
+		FOR UPDATE OF t SKIP LOCKED`,
+		entity.TransferStatusInProgress, stuckAfter.Seconds(),
+	))
+	if err != nil {
+		return entity.Transfer{}, fmt.Errorf("get stuck transfer with block: %w", err)
+	}
+	return transfer, nil
+}
+
+// scanTransfer reads a row with the columns from the SELECT queries above.
+func scanTransfer(row pgx.Row) (entity.Transfer, error) {
+	var transfer entity.Transfer
+	err := row.Scan(
 		&transfer.ID,
 		&transfer.IdempotencyKey,
 		&transfer.FromAccount.ID,
@@ -74,16 +140,13 @@ func (s *Storage) GetTransferByIdempotencyKey(ctx context.Context, idempotencyKe
 		&transfer.ToAccount.Code,
 		&transfer.Amount,
 		&transfer.Status,
-		&transfer.Reason,
+		&transfer.ReasonCode,
 		&transfer.CreatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return entity.Transfer{}, entity.ErrStorageNotFound
 	}
-	if err != nil {
-		return entity.Transfer{}, fmt.Errorf("get transfer by idempotency key: %w", err)
-	}
-	return transfer, nil
+	return transfer, err
 }
 
 func (s *Storage) UpdateTransfer(ctx context.Context, transfer entity.Transfer) error {
@@ -91,14 +154,14 @@ func (s *Storage) UpdateTransfer(ctx context.Context, transfer entity.Transfer) 
 	tag, err := s.db.Exec(ctx, `
 		UPDATE transfers
 		SET status            = $2,
-		    reason            = nullif($3, ''),
+		    reason_code       = nullif($3::INTEGER, 0),
 		    from_account_id   = $4,
 		    from_account_code = CASE WHEN $4::BIGINT IS NULL THEN from_account_code END,
 		    to_account_id     = $5,
 		    to_account_code   = CASE WHEN $5::BIGINT IS NULL THEN to_account_code END,
 		    updated_at        = now()
 		WHERE id = $1`,
-		transfer.ID, transfer.Status, transfer.Reason, transfer.FromAccount.ID, transfer.ToAccount.ID,
+		transfer.ID, transfer.Status, transfer.ReasonCode, transfer.FromAccount.ID, transfer.ToAccount.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("update transfer: %w", err)

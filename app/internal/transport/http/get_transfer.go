@@ -2,27 +2,30 @@ package http
 
 import (
 	"context"
-	"time"
+	"strconv"
 
-	"github.com/danielgtaylor/huma/v2"
+	"github.com/dqso/coin-transfer-service/app/internal/entity"
+	"github.com/dqso/coin-transfer-service/app/internal/transport/http/oas"
 )
 
-type GetTransferInput struct {
-	IdempotencyKey string `path:"idempotency_key"`
-}
-
-type GetTransferOutput struct {
-	Body struct {
-		TransferID     string    `json:"transfer_id"`
-		IdempotencyKey string    `json:"idempotency_key"`
-		FromAccountID  string    `json:"from_account_id"`
-		ToAccountID    string    `json:"to_account_id"`
-		Amount         int64     `json:"amount"`
-		Status         string    `json:"status"`
-		CreatedAt      time.Time `json:"created_at"`
+func (h *Handler) GetTransfer(ctx context.Context, params oas.GetTransferParams) (*oas.Transfer, error) {
+	transfer, err := h.usecase.GetTransfer(ctx, params.IdempotencyKey)
+	if err != nil {
+		return nil, err
 	}
-}
 
-func (h *Handler) GetTransfer(_ context.Context, _ *GetTransferInput) (*GetTransferOutput, error) {
-	return nil, huma.Error501NotImplemented("not implemented")
+	resp := &oas.Transfer{
+		TransferID:     strconv.FormatInt(transfer.ID, 10),
+		IdempotencyKey: transfer.IdempotencyKey,
+		FromAccountID:  transfer.FromAccount.Code,
+		ToAccountID:    transfer.ToAccount.Code,
+		Amount:         transfer.Amount,
+		Status:         oas.TransferStatus(transfer.Status),
+		CreatedAt:      transfer.CreatedAt,
+	}
+	if transfer.Status == entity.TransferStatusRejected {
+		resp.Reason = oas.NewOptString(transfer.ReasonCode.String())
+		resp.Code = oas.NewOptInt(int(transfer.ReasonCode))
+	}
+	return resp, nil
 }

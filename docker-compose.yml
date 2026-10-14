@@ -1,9 +1,14 @@
 services:
   app:
     build: .
-    container_name: coin-transfer-app
+    # No container_name: Compose names the replicas itself (app-1, app-2).
+    deploy:
+      replicas: 2
+    # Each replica takes a free host port from the range: 3000, 3001.
     ports:
-      - "3000:3000"
+      - "3000-3001:3000"
+    env_file: .env
+    stop_grace_period: 20s
     depends_on:
       postgres:
         condition: service_healthy
@@ -21,12 +26,7 @@ services:
       context: .
       dockerfile: tern.Dockerfile
     container_name: coin-transfer-migrate
-    environment:
-      PGHOST: postgres
-      PGPORT: 5432
-      PGDATABASE: devdb
-      PGUSER: app
-      PGPASSWORD: psswrd
+    env_file: .env
     depends_on:
       postgres:
         condition: service_healthy
@@ -35,15 +35,15 @@ services:
     image: postgres:18-alpine3.24
     container_name: coin-transfer-postgres
     environment:
-      POSTGRES_DB: devdb
-      POSTGRES_USER: app
-      POSTGRES_PASSWORD: psswrd
+      POSTGRES_DB: ${PGDATABASE}
+      POSTGRES_USER: ${PGUSER}
+      POSTGRES_PASSWORD: ${PGPASSWORD}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U app -d devdb"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 2s
       timeout: 3s
       retries: 15

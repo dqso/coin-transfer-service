@@ -2,29 +2,31 @@ package http
 
 import (
 	"context"
+	"strconv"
 
-	"github.com/danielgtaylor/huma/v2"
+	"github.com/dqso/coin-transfer-service/app/internal/entity"
+	"github.com/dqso/coin-transfer-service/app/internal/transport/http/oas"
 )
 
-type CreateTransferInput struct {
-	Body struct {
-		IdempotencyKey string `json:"idempotency_key" minLength:"1"`
-		FromAccountID  string `json:"from_account_id" minLength:"1"`
-		ToAccountID    string `json:"to_account_id" minLength:"1"`
-		Amount         int64  `json:"amount"`
+func (h *Handler) CreateTransfer(ctx context.Context, req *oas.CreateTransferRequest) (oas.CreateTransferRes, error) {
+	transfer, err := h.usecase.CreateTransfer(ctx, req.IdempotencyKey, req.FromAccountID, req.ToAccountID, req.Amount)
+	if err != nil {
+		return nil, err
 	}
-}
 
-type CreateTransferOutput struct {
-	Body struct {
-		TransferID    string `json:"transfer_id"`
-		Status        string `json:"status"`
-		FromAccountID string `json:"from_account_id"`
-		ToAccountID   string `json:"to_account_id"`
-		Amount        int64  `json:"amount"`
+	if transfer.Status == entity.TransferStatusRejected {
+		return &oas.RejectedTransfer{
+			Status: oas.RejectedTransferStatusRejected,
+			Reason: transfer.ReasonCode.String(),
+			Code:   int(transfer.ReasonCode),
+		}, nil
 	}
-}
 
-func (h *Handler) CreateTransfer(_ context.Context, _ *CreateTransferInput) (*CreateTransferOutput, error) {
-	return nil, huma.Error501NotImplemented("not implemented")
+	return &oas.CreateTransferResponse{
+		TransferID:    strconv.FormatInt(transfer.ID, 10),
+		Status:        oas.CreateTransferResponseStatusCompleted,
+		FromAccountID: transfer.FromAccount.Code,
+		ToAccountID:   transfer.ToAccount.Code,
+		Amount:        transfer.Amount,
+	}, nil
 }

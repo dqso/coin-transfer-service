@@ -9,6 +9,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/dqso/coin-transfer-service/app/internal/entity"
 )
 
 const (
@@ -70,7 +72,7 @@ func TestLoadData(t *testing.T) {
 				idempotency_key,
 				from_account_id, from_account_code,
 				to_account_id, to_account_code,
-				amount, status, reason, created_at, updated_at
+				amount, status, reason_code, created_at, updated_at
 			)
 			SELECT gen_random_uuid()::TEXT,
 			       CASE WHEN kind = 'unknown' THEN NULL ELSE from_id END,
@@ -80,9 +82,9 @@ func TestLoadData(t *testing.T) {
 			       amount,
 			       (CASE WHEN kind = 'completed' THEN 'completed' ELSE 'rejected' END)::transfer_status,
 			       CASE kind
-			           WHEN 'insufficient' THEN 'insufficient funds'
-			           WHEN 'unknown' THEN 'account not found'
-			           WHEN 'self' THEN 'self-transfer not allowed'
+			           WHEN 'insufficient' THEN $4::INTEGER
+			           WHEN 'unknown' THEN $5::INTEGER
+			           WHEN 'self' THEN $6::INTEGER
 			       END,
 			       created_at,
 			       created_at
@@ -104,6 +106,7 @@ func TestLoadData(t *testing.T) {
 				) AS s
 			) AS g`,
 			firstAccountID, loadAccounts, loadTransfers,
+			entity.CodeInsufficientFunds, entity.CodeTransferAccountNotFound, entity.CodeSelfTransferNotAllowed,
 		)
 		if err != nil {
 			return fmt.Errorf("insert transfers: %w", err)
