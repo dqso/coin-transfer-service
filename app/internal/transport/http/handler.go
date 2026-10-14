@@ -22,6 +22,7 @@ var openapiSpec []byte
 type Handler struct {
 	log             *slog.Logger
 	mux             *http.ServeMux
+	root            http.Handler
 	usecase         usecase
 	readinessChecks []ReadinessCheck
 }
@@ -59,12 +60,13 @@ func NewHandler(log *slog.Logger, usecase usecase, readinessChecks ...ReadinessC
 	h.mux.HandleFunc("GET /openapi.yaml", h.OpenAPISpec)
 	h.mux.HandleFunc("GET /docs", h.Docs)
 	h.mux.Handle("/", api)
+	h.root = h.withRequestLog(h.mux)
 
 	return h, nil
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	h.mux.ServeHTTP(w, r)
+	h.root.ServeHTTP(w, r)
 }
 
 func (h *Handler) OpenAPISpec(w http.ResponseWriter, _ *http.Request) {

@@ -5,6 +5,7 @@ package integration
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"testing"
 
@@ -100,6 +101,10 @@ func TestCreateTransfer_Validation(t *testing.T) {
 		{name: "empty receiver account", req: transferRequest{IdempotencyKey: "key-2", FromAccountID: "acc_1", ToAccountID: "", Amount: 100}},
 		{name: "zero amount", req: transferRequest{IdempotencyKey: "key-3", FromAccountID: "acc_1", ToAccountID: "acc_2", Amount: 0}},
 		{name: "negative amount", req: transferRequest{IdempotencyKey: "key-4", FromAccountID: "acc_1", ToAccountID: "acc_2", Amount: -100}},
+		{name: "too big amount", req: transferRequest{IdempotencyKey: "key-5", FromAccountID: "acc_1", ToAccountID: "acc_2", Amount: 1_000_000_001}},
+		{name: "too long idempotency key", req: transferRequest{IdempotencyKey: strings.Repeat("k", 256), FromAccountID: "acc_1", ToAccountID: "acc_2", Amount: 100}},
+		{name: "too long source account", req: transferRequest{IdempotencyKey: "key-6", FromAccountID: strings.Repeat("a", 65), ToAccountID: "acc_2", Amount: 100}},
+		{name: "too long receiver account", req: transferRequest{IdempotencyKey: "key-7", FromAccountID: "acc_1", ToAccountID: strings.Repeat("a", 65), Amount: 100}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

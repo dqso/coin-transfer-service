@@ -17,9 +17,11 @@ func (u *Usecase) FinishStuckTransfers(ctx context.Context, stuckAfter time.Dura
 	finished := 0
 	for finished < limit {
 		// One transaction for one transfer: an error in one transfer does not undo the others.
+		var transfer entity.Transfer
 		found := false
 		err := u.storage.InTransaction(ctx, func(ctx context.Context, tx entity.Storage) error {
-			transfer, err := tx.GetStuckTransferWithBlock(ctx, stuckAfter)
+			var err error
+			transfer, err = tx.GetStuckTransferWithBlock(ctx, stuckAfter)
 			if errors.Is(err, entity.ErrStorageNotFound) {
 				return nil
 			}
@@ -39,6 +41,7 @@ func (u *Usecase) FinishStuckTransfers(ctx context.Context, stuckAfter time.Dura
 		if !found {
 			break
 		}
+		u.logTransfer(ctx, "stuck transfer executed", transfer)
 		finished++
 	}
 	return finished, nil

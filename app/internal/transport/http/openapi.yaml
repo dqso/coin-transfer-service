@@ -97,6 +97,7 @@ paths:
           required: true
           schema:
             type: string
+            maxLength: 255
           example: 01234567-89ab-cdef-0123-456789abcdef
       responses:
         "200":
@@ -141,6 +142,7 @@ paths:
           required: true
           schema:
             type: string
+            maxLength: 64
           example: acc_1
       responses:
         "200":
@@ -206,19 +208,23 @@ components:
         idempotency_key:
           type: string
           minLength: 1
+          maxLength: 255
           example: 01234567-89ab-cdef-0123-456789abcdef
         from_account_id:
           type: string
           minLength: 1
+          maxLength: 64
           example: acc_1
         to_account_id:
           type: string
           minLength: 1
+          maxLength: 64
           example: acc_2
         amount:
           type: integer
           format: int64
           minimum: 1
+          maximum: 1000000000
           example: 100
 
     CreateTransferResponse:

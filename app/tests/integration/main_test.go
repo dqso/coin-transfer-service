@@ -123,7 +123,7 @@ func newApp(t *testing.T) *app {
 	t.Cleanup(pool.Close)
 
 	log := slog.New(slog.DiscardHandler)
-	uc := usecase.NewUsecase(postgres.NewStorage(pool))
+	uc := usecase.NewUsecase(log, postgres.NewStorage(pool))
 	handler, err := transporthttp.NewHandler(log, uc, pool.Ping)
 	require.NoError(t, err, "create http handler")
 	server := httptest.NewServer(handler)

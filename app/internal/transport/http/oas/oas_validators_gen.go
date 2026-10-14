@@ -17,8 +17,8 @@ func (s *CreateTransferRequest) Validate() error {
 		if err := (validate.String{
 			MinLength:     1,
 			MinLengthSet:  true,
-			MaxLength:     0,
-			MaxLengthSet:  false,
+			MaxLength:     255,
+			MaxLengthSet:  true,
 			Email:         false,
 			Hostname:      false,
 			Regex:         nil,
@@ -40,8 +40,8 @@ func (s *CreateTransferRequest) Validate() error {
 		if err := (validate.String{
 			MinLength:     1,
 			MinLengthSet:  true,
-			MaxLength:     0,
-			MaxLengthSet:  false,
+			MaxLength:     64,
+			MaxLengthSet:  true,
 			Email:         false,
 			Hostname:      false,
 			Regex:         nil,
@@ -63,8 +63,8 @@ func (s *CreateTransferRequest) Validate() error {
 		if err := (validate.String{
 			MinLength:     1,
 			MinLengthSet:  true,
-			MaxLength:     0,
-			MaxLengthSet:  false,
+			MaxLength:     64,
+			MaxLengthSet:  true,
 			Email:         false,
 			Hostname:      false,
 			Regex:         nil,
@@ -86,8 +86,8 @@ func (s *CreateTransferRequest) Validate() error {
 		if err := (validate.Int{
 			MinSet:        true,
 			Min:           1,
-			MaxSet:        false,
-			Max:           0,
+			MaxSet:        true,
+			Max:           1000000000,
 			MinExclusive:  false,
 			MaxExclusive:  false,
 			MultipleOfSet: false,

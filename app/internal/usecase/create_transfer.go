@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/dqso/coin-transfer-service/app/internal/entity"
@@ -29,7 +30,11 @@ func (u *Usecase) CreateTransfer(ctx context.Context, idempotencyKey, fromAccoun
 
 	// The first request with this key does the work. If the client of the first request goes away,
 	// the work must go on for the other requests, so it does not use the request context.
+	// isLeader is true if this request does the work. Other requests in the group only wait.
+	// It is written before the result is sent to the channel, so it is safe to read after it.
+	isLeader := false
 	result := u.transfersInFlight.DoChan(idempotencyKey, func() (any, error) {
+		isLeader = true
 		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), transferTimeout)
 		defer cancel()
 		return u.createOrGetTransfer(ctx, idempotencyKey, fromAccountCode, toAccountCode, amount)
@@ -48,7 +53,15 @@ func (u *Usecase) CreateTransfer(ctx context.Context, idempotencyKey, fromAccoun
 
 	// Requests in one group can have different details, so every request checks them itself.
 	if !transfer.IsSamePaymentDetails(fromAccountCode, toAccountCode, amount) {
+		// The transfer belongs to another request, so only its id is written.
+		u.log.InfoContext(ctx, "idempotency key is already used with other payment details",
+			slog.String("idempotency_key", idempotencyKey),
+			slog.Int64("existing_transfer_id", transfer.ID),
+		)
 		return entity.Transfer{}, entity.ErrIdempotencyKeyConflict
+	}
+	if !isLeader {
+		u.logTransfer(ctx, "transfer joined: the result is taken from a parallel request", transfer)
 	}
 	// Another instance of the service can still do this transfer,
 	// or the transfer is stuck and waits for the stuck transfers worker.
@@ -66,9 +79,14 @@ func (u *Usecase) createOrGetTransfer(ctx context.Context, idempotencyKey, fromA
 		return entity.Transfer{}, err
 	}
 	if !wasCreated {
+		// For other details CreateTransfer writes about the conflict itself.
+		if transfer.IsSamePaymentDetails(fromAccountCode, toAccountCode, amount) {
+			u.logTransfer(ctx, "transfer already exists", transfer)
+		}
 		return transfer, nil
 	}
 
+	executed := false
 	err = u.storage.InTransaction(ctx, func(ctx context.Context, tx entity.Storage) error {
 		// The stuck transfers worker can take this transfer if the request is very slow.
 		// The lock and the status check make sure that only one of them does the transfer.
@@ -84,6 +102,7 @@ func (u *Usecase) createOrGetTransfer(ctx context.Context, idempotencyKey, fromA
 		if err := executeTransfer(ctx, tx, &transfer); err != nil {
 			return err
 		}
+		executed = true
 		return tx.UpdateTransfer(ctx, transfer)
 	})
 	if err != nil {
@@ -96,7 +115,21 @@ func (u *Usecase) createOrGetTransfer(ctx context.Context, idempotencyKey, fromA
 		return entity.Transfer{}, err
 	}
 
+	if executed {
+		u.logTransfer(ctx, "transfer executed", transfer)
+	} else {
+		u.logTransfer(ctx, "transfer already finished by the stuck transfers worker", transfer)
+	}
 	return transfer, nil
+}
+
+func (u *Usecase) logTransfer(ctx context.Context, msg string, transfer entity.Transfer) {
+	u.log.InfoContext(ctx, msg,
+		slog.Int64("transfer_id", transfer.ID),
+		slog.String("idempotency_key", transfer.IdempotencyKey),
+		slog.String("status", transfer.Status.String()),
+		slog.Int("code", int(transfer.ReasonCode)),
+	)
 }
 
 // executeTransfer checks the business rules and moves the coins.
