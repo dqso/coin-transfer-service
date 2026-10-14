@@ -50,7 +50,8 @@ func (u *Usecase) CreateTransfer(ctx context.Context, idempotencyKey, fromAccoun
 	if !transfer.IsSamePaymentDetails(fromAccountCode, toAccountCode, amount) {
 		return entity.Transfer{}, entity.ErrIdempotencyKeyConflict
 	}
-	// Another instance of the service or a failed request can still own this key.
+	// Another instance of the service can still do this transfer,
+	// or the transfer is stuck and waits for the stuck transfers worker.
 	if transfer.Status == entity.TransferStatusInProgress {
 		return entity.Transfer{}, entity.ErrTransferInProgress
 	}
@@ -69,6 +70,17 @@ func (u *Usecase) createOrGetTransfer(ctx context.Context, idempotencyKey, fromA
 	}
 
 	err = u.storage.InTransaction(ctx, func(ctx context.Context, tx entity.Storage) error {
+		// The stuck transfers worker can take this transfer if the request is very slow.
+		// The lock and the status check make sure that only one of them does the transfer.
+		locked, err := tx.GetTransferWithBlock(ctx, transfer.ID)
+		if err != nil {
+			return err
+		}
+		if locked.Status != entity.TransferStatusInProgress {
+			transfer = locked
+			return nil
+		}
+
 		if err := executeTransfer(ctx, tx, &transfer); err != nil {
 			return err
 		}
@@ -78,7 +90,7 @@ func (u *Usecase) createOrGetTransfer(ctx context.Context, idempotencyKey, fromA
 		// The transaction is rolled back, so no coins were moved. Free the idempotency key,
 		// so the client can send the request again. The request context can be already canceled.
 		if delErr := u.storage.DeleteInProgressTransfer(context.WithoutCancel(ctx), transfer.ID); delErr != nil {
-			// The transfer stays in progress. A worker will remove it later.
+			// The transfer stays in progress. The stuck transfers worker will finish it later.
 			return entity.Transfer{}, errors.Join(err, delErr)
 		}
 		return entity.Transfer{}, err

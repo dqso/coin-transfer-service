@@ -102,9 +102,10 @@ func migrateTemplate(ctx context.Context) error {
 
 // app is the service with its own clean database: the seed accounts and nothing else.
 type app struct {
-	t    *testing.T
-	url  string
-	pool *pgxpool.Pool
+	t       *testing.T
+	url     string
+	pool    *pgxpool.Pool
+	usecase *usecase.Usecase
 }
 
 func newApp(t *testing.T) *app {
@@ -122,12 +123,13 @@ func newApp(t *testing.T) *app {
 	t.Cleanup(pool.Close)
 
 	log := slog.New(slog.DiscardHandler)
-	handler, err := transporthttp.NewHandler(log, usecase.NewUsecase(postgres.NewStorage(pool)), pool.Ping)
+	uc := usecase.NewUsecase(postgres.NewStorage(pool))
+	handler, err := transporthttp.NewHandler(log, uc, pool.Ping)
 	require.NoError(t, err, "create http handler")
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
 
-	return &app{t: t, url: server.URL, pool: pool}
+	return &app{t: t, url: server.URL, pool: pool, usecase: uc}
 }
 
 func createDatabase(t *testing.T, name string) {

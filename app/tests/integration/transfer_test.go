@@ -298,6 +298,7 @@ func TestGetTransfer(t *testing.T) {
 		assert.Equal(t, "acc_2", resp.ToAccountID)
 		assert.EqualValues(t, 100, resp.Amount)
 		assert.Equal(t, "completed", resp.Status)
+		assert.Empty(t, resp.Reason, "a completed transfer has no reason")
 		assert.False(t, resp.CreatedAt.IsZero(), "created_at must be set")
 	})
 
@@ -308,6 +309,7 @@ func TestGetTransfer(t *testing.T) {
 		// The unknown account code comes back as the client sent it.
 		assert.Equal(t, "acc_404", resp.FromAccountID)
 		assert.Equal(t, "rejected", resp.Status)
+		assert.Equal(t, "account not found", resp.Reason)
 	})
 
 	t.Run("not found", func(t *testing.T) {

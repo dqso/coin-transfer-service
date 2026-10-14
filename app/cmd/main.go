@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/dqso/coin-transfer-service/app/internal/repository/postgres"
 	transporthttp "github.com/dqso/coin-transfer-service/app/internal/transport/http"
 	"github.com/dqso/coin-transfer-service/app/internal/usecase"
+	"github.com/dqso/coin-transfer-service/app/internal/worker"
 )
 
 func main() {
@@ -41,6 +43,15 @@ func run(log *slog.Logger) error {
 	storage := postgres.NewStorage(pool)
 
 	uc := usecase.NewUsecase(storage)
+
+	// The worker stops with the shutdown signal. Wait for it before the pool is closed.
+	var wg sync.WaitGroup
+	defer func() {
+		stop()
+		wg.Wait()
+	}()
+	stuckTransfers := worker.NewStuckTransfers(log, uc)
+	wg.Go(func() { stuckTransfers.Run(ctx) })
 
 	httpHandler, err := transporthttp.NewHandler(log, uc,
 		pool.Ping,

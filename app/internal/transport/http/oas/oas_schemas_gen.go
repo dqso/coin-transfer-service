@@ -234,6 +234,98 @@ func (s *ErrorStatusCode) SetResponse(val Error) {
 	s.Response = val
 }
 
+// NewOptInt returns new OptInt with value set to v.
+func NewOptInt(v int) OptInt {
+	return OptInt{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInt is optional int.
+type OptInt struct {
+	Value int
+	Set   bool
+}
+
+// IsSet returns true if OptInt was set.
+func (o OptInt) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInt) Reset() {
+	var v int
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInt) SetTo(v int) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInt) Get() (v int, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInt) Or(d int) int {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptString returns new OptString with value set to v.
+func NewOptString(v string) OptString {
+	return OptString{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptString is optional string.
+type OptString struct {
+	Value string
+	Set   bool
+}
+
+// IsSet returns true if OptString was set.
+func (o OptString) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptString) Reset() {
+	var v string
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptString) SetTo(v string) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptString) Get() (v string, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptString) Or(d string) string {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // Ref: #/components/schemas/RejectedTransfer
 type RejectedTransfer struct {
 	Status RejectedTransferStatus `json:"status"`
@@ -315,7 +407,11 @@ type Transfer struct {
 	ToAccountID    string         `json:"to_account_id"`
 	Amount         int64          `json:"amount"`
 	Status         TransferStatus `json:"status"`
-	CreatedAt      time.Time      `json:"created_at"`
+	// Only for a rejected transfer.
+	Reason OptString `json:"reason"`
+	// Only for a rejected transfer.
+	Code      OptInt    `json:"code"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // GetTransferID returns the value of TransferID.
@@ -346,6 +442,16 @@ func (s *Transfer) GetAmount() int64 {
 // GetStatus returns the value of Status.
 func (s *Transfer) GetStatus() TransferStatus {
 	return s.Status
+}
+
+// GetReason returns the value of Reason.
+func (s *Transfer) GetReason() OptString {
+	return s.Reason
+}
+
+// GetCode returns the value of Code.
+func (s *Transfer) GetCode() OptInt {
+	return s.Code
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -381,6 +487,16 @@ func (s *Transfer) SetAmount(val int64) {
 // SetStatus sets the value of Status.
 func (s *Transfer) SetStatus(val TransferStatus) {
 	s.Status = val
+}
+
+// SetReason sets the value of Reason.
+func (s *Transfer) SetReason(val OptString) {
+	s.Reason = val
+}
+
+// SetCode sets the value of Code.
+func (s *Transfer) SetCode(val OptInt) {
+	s.Code = val
 }
 
 // SetCreatedAt sets the value of CreatedAt.
