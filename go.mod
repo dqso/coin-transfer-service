@@ -11,6 +11,7 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/testcontainers/testcontainers-go v0.44.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.44.0
+	go.uber.org/mock v0.6.0
 	golang.org/x/sync v0.24.0
 )
 
@@ -91,4 +92,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
-tool github.com/ogen-go/ogen/cmd/ogen
+tool (
+	github.com/ogen-go/ogen/cmd/ogen
+	go.uber.org/mock/mockgen
+)

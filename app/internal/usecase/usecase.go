@@ -1,5 +1,7 @@
 package usecase
 
+//go:generate go tool mockgen -typed -source=../entity/storage.go -destination=mocks_test.go -package=usecase
+
 import (
 	"log/slog"
 

@@ -12,6 +12,16 @@ generate: ## Generate code
 test: ## Run unit tests
 	go test -race ./...
 
+.PHONY: cover
+cover: ## Show unit test coverage by function
+	go test -coverprofile=coverage.out ./...
+	@grep -v '/oas/' coverage.out > coverage.tmp && mv coverage.tmp coverage.out
+	go tool cover -func=coverage.out
+
+.PHONY: cover-html
+cover-html: cover ## Open unit test coverage in the browser
+	go tool cover -html=coverage.out
+
 .PHONY: test-integration
 test-integration: ## Run integration tests (needs Docker)
 	go test -race -tags integration -count=1 ./app/tests/integration/
