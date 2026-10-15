@@ -1,5 +1,7 @@
 package worker
 
+//go:generate go tool mockgen -typed -source=stuck_transfers.go -destination=mocks_test.go -package=worker -mock_names=usecase=MockUsecase
+
 import (
 	"context"
 	"log/slog"
